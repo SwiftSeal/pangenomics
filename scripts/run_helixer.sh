@@ -21,6 +21,7 @@ BASENAME=$(basename -- "$FILE")
 BASENAME="${BASENAME%.*}"
 
 singularity exec --nv -H $PWD "$APPS/helixer-docker_helixer_v0.3.0_cuda_11.2.0-cudnn8.sif" Helixer.py \
+--species $BASENAME \
 --fasta-path $FILE \
 --gff-output-path  gff/$BASENAME.gff \
 --model-filepath "helixer_model/land_plant_v0.3_a_0080.h5"
