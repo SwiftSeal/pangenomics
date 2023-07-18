@@ -1,16 +1,14 @@
 #!/bin/bash
 
+#SBATCH -J helixer
+#SBATCH -p gpu
 #SBATCH -c 4
 #SBATCH --gpus=1
 #SBATCH --mem=16gb
-#SBATCH -J helixer
-#SBATCH -p gpu
 #SBATCH --array=1-19
 #SBATCH --export=ALL
 #SBATCH -o slurm/helixer.%j.out
 #SBATCH -e slurm/helixer.%j.err
-#SBATCH --mail-user=moray.smith@hutton.ac.uk
-#SBATCH --mail-type=END,FAIL
 
 mkdir -p gff
 
