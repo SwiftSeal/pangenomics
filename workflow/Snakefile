@@ -1,28 +1,28 @@
 genomes = [
-    candolleanum,
-    etuberosum,
-    lycopersicum,
-    tuberosum_phureja_E4_63,
-    tuberosum_tuberosum_RH10_15,
-    chilense,
-    galapagense,
-    neorickii,
-    tuberosum_phureja_E86_69,
-    tuberosum_tuberosum_RH,
-    chmielewskii,
-    habrochaites,
-    peruvianum,
-    tuberosum_stenotomum_A6_26,
-    verrucosum,
-    corneliomulleri,
-    lycopersicoides,
-    pimpinellifolium,
-    tuberosum_stenotomum_PG6359
+    "candolleanum",
+    "etuberosum",
+    "lycopersicum",
+    "tuberosum_phureja_E4_63",
+    "tuberosum_tuberosum_RH10_15",
+    "chilense",
+    "galapagense",
+    "neorickii",
+    "tuberosum_phureja_E86_69",
+    "tuberosum_tuberosum_RH",
+    "chmielewskii",
+    "habrochaites",
+    "peruvianum",
+    "tuberosum_stenotomum_A6_26",
+    "verrucosum",
+    "corneliomulleri",
+    "lycopersicoides",
+    "pimpinellifolium",
+    "tuberosum_stenotomum_PG6359",
 ]
 
 rule all:
-    expand("results/peptide/{genome}.fa", genome=genomes),
-    expand("results/bed/{genome}.bed", genome=genomes)
+    expand("results/peptide/{genome}.fa", genome = genomes),
+    expand("results/bed/{genome}.bed", genome = genomes)
 
 rule helixer:
     input:
