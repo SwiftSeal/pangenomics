@@ -1,0 +1,88 @@
+genomes = [
+    candolleanum,
+    etuberosum,
+    lycopersicum,
+    tuberosum_phureja_E4_63,
+    tuberosum_tuberosum_RH10_15,
+    chilense,
+    galapagense,
+    neorickii,
+    tuberosum_phureja_E86_69,
+    tuberosum_tuberosum_RH,
+    chmielewskii,
+    habrochaites,
+    peruvianum,
+    tuberosum_stenotomum_A6_26,
+    verrucosum,
+    corneliomulleri,
+    lycopersicoides,
+    pimpinellifolium,
+    tuberosum_stenotomum_PG6359
+]
+
+rule all:
+    expand("results/peptide/{genome}.fa", genome=genomes),
+    expand("results/bed/{genome}.bed", genome=genomes)
+
+rule helixer:
+    input:
+        "genomes/{genome}.fa"
+    output:
+        "results/helixer/{genomes}.gff"
+    params:
+        genome = "{genome}"
+    threads: 4
+    resources:
+        mem_mb = 16000,
+        partition = "gpu",
+        slurm = "gpus=1"
+    shell:
+        """
+        singularity exec --nv -H $PWD "$APPS/helixer-docker_helixer_v0.3.0_cuda_11.2.0-cudnn8.sif" Helixer.py \
+        --species {genome} \
+        --fasta-path {input} \
+        --gff-output-path {output} \
+        --model-filepath "helixer_model/land_plant_v0.3_a_0080.h5"
+        """
+
+rule get_bed:
+    input:
+        "results/helixer/{genome}.gff"
+    output:
+        "results/bed/{genome}.bed"
+    conda:
+        "envs/agat.yml"
+    threads: 1
+    resources:
+        mem_mb = 4000,
+        partition = "short"
+    shell:
+        """
+        agat_convert_sp_gff2bed.pl \
+        --gff {input} \
+        -o {output}
+
+        awk -i inplace '{OFS="\t"; print $1, $2, $3, $4}' {output}
+        """
+
+rule get_peptide:
+    input:
+        genome = "genomes/{genome}.fa",
+        gff = "results/helixer/{genome}.gff"
+    output:
+        "results/peptide/{genome}.fa"
+    conda:
+        "envs/agat.yml"
+    threads: 1
+    resources:
+        mem_mb = 4000,
+        partition = "short"
+    shell:
+        """
+        agat_sp_extract_sequences.pl \
+        -g {input.gff} \
+        -f {input.genome} \
+        -p -o {output}
+
+        sed -i 's/\(>[^ ]*\) .*/\1/' {output}
+        """

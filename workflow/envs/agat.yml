@@ -1,0 +1,4 @@
+channels:
+ - bioconda
+dependencies:
+ - agat=1.2.0
