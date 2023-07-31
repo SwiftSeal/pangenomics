@@ -22,8 +22,7 @@ genomes = [
 
 rule all:
     input:
-        expand("results/peptide/{genome}.fa", genome = genomes),
-        expand("results/bed/{genome}.bed", genome = genomes)
+        "results/results/N0.tsv"
 
 rule helixer:
     input:
