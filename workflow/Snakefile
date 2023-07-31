@@ -84,3 +84,21 @@ rule get_peptide:
         -f {input.genome} \
         -p -o {output}
         """
+
+rule genespace:
+    input:
+        expand("results/peptide/{genome}.fa", genome = genomes),
+        expand("results/bed/{genome}.bed", genome = genomes)
+    output:
+        "results/results/N0.tsv"
+    params:
+        path2mcscanx = "~/scratch/apps/MCScanX/MCScanX"
+    conda:
+        "envs/genespace.yml"
+    threads: 16
+    resources:
+        mem_mb = 32000
+    shell:
+        """
+        Rscript scripts/genespace.R {params.path2mcscanx}
+        """
