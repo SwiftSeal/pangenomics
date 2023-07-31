@@ -79,9 +79,8 @@ rule get_peptide:
     shell:
         """
         agat_sp_extract_sequences.pl \
+        --cfs \
         -g {input.gff} \
         -f {input.genome} \
         -p -o {output}
-
-        sed -i 's/\(>[^ ]*\) .*/\1/' {output}
         """
