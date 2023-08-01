@@ -1,3 +1,5 @@
+from Bio import SeqIO
+
 genomes = [
     "candolleanum",
     "etuberosum",
@@ -68,7 +70,7 @@ rule get_peptide:
         genome = "genomes/{genome}.fa",
         gff = "results/helixer/{genome}.gff"
     output:
-        "results/peptide/{genome}.fa"
+        "results/fasta/{genome}.fa"
     conda:
         "envs/agat.yml"
     threads: 1
@@ -83,6 +85,18 @@ rule get_peptide:
         -f {input.genome} \
         -p -o {output}
         """
+
+rule clean_peptide:
+    input:
+        "results/fasta/{genome}.fa"
+    output:
+        "results/peptide/{genome}.fa"
+    run:
+        # remove any description from the fasta file
+        with open(input[0], "r") as infile, open(output[0], "w") as outfile:
+            for record in SeqIO.parse(infile, "fasta"):
+                record.description = ""
+                SeqIO.write(record, outfile, "fasta")
 
 rule genespace:
     input:
