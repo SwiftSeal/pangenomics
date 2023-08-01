@@ -113,5 +113,5 @@ rule genespace:
         mem_mb = 32000
     shell:
         """
-        Rscript scripts/genespace.R {params.path2mcscanx}
+        Rscript workflow/scripts/genespace.R {params.path2mcscanx}
         """
