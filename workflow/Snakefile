@@ -24,7 +24,8 @@ genomes = [
 
 rule all:
     input:
-        "results/results/N0.tsv"
+        "results/results/N0.tsv",
+        expand("results/resistify/{genome}/results.tsv", genome = genomes)
 
 rule helixer:
     input:
@@ -97,6 +98,22 @@ rule clean_peptide:
             for record in SeqIO.parse(infile, "fasta"):
                 record.description = ""
                 SeqIO.write(record, outfile, "fasta")
+
+rule resistify:
+    input:
+        "results/peptide/{genome}.fa"
+    output:
+        "results/resistify/{genome}/results.tsv"
+    conda:
+        "envs/resistify.yml"
+    threads: 4
+    resources:
+        mem_mb = 8000,
+        partition = "medium"
+    shell:
+        """
+        resistify {input} resistify/{wildcards.genome}
+        """
 
 rule genespace:
     input:
