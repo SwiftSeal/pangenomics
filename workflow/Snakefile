@@ -112,7 +112,7 @@ rule resistify:
         partition = "medium"
     shell:
         """
-        resistify {input} resistify/{wildcards.genome}
+        resistify {input} results/resistify/{wildcards.genome}
         """
 
 rule genespace:
