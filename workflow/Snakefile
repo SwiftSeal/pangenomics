@@ -1,6 +1,10 @@
 from Bio import SeqIO
 
 genomes = [
+    "americanum_sp2275",
+    "americanum_sp2273",
+    "americanum_sp2271",
+    "americanum_sp1102",
     "candolleanum",
     "etuberosum",
     "lycopersicum",
@@ -24,7 +28,7 @@ genomes = [
 
 rule all:
     input:
-        "results/results/N0.tsv",
+        "results/orthofinder/Orthogroups.tsv",
         expand("results/resistify/{genome}/results.tsv", genome = genomes)
 
 rule helixer:
@@ -115,20 +119,17 @@ rule resistify:
         resistify {input} results/resistify/{wildcards.genome}
         """
 
-rule genespace:
+rule orthofinder:
     input:
-        expand("results/peptide/{genome}.fa", genome = genomes),
-        expand("results/bed/{genome}.bed", genome = genomes)
+        expand("results/peptide/{genome}.fa", genome = genomes)
     output:
-        "results/results/N0.tsv"
-    params:
-        path2mcscanx = "~/scratch/apps/MCScanX/MCScanX"
+        "results/orthofinder/Orthogroups.tsv"
     conda:
-        "envs/genespace.yml"
+        "envs/orthofinder.yml"
     threads: 16
     resources:
         mem_mb = 32000
     shell:
         """
-        Rscript workflow/scripts/genespace.R {params.path2mcscanx}
+        orthofinder -t 16 -f results/peptide
         """

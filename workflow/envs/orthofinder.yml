@@ -1,6 +1,4 @@
-name: genespace
 channels:
  - bioconda
- - conda-forge
 dependencies:
- - 
+ - orthofinder

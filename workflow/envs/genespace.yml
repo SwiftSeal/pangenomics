@@ -1,8 +1,0 @@
-channels:
- - bioconda
- - conda-forge
-dependencies:
- - orthofinder=2.5.5
- - r-devtools=2.4.5
- - bioconductor-biostrings=2.68.1
- - bioconductor-rtracklayer=1.60.0
