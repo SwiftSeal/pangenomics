@@ -1,10 +1,6 @@
 from Bio import SeqIO
 
 genomes = [
-    "americanum_sp2275",
-    "americanum_sp2273",
-    "americanum_sp2271",
-    "americanum_sp1102",
     "candolleanum",
     "etuberosum",
     "lycopersicum",
@@ -28,8 +24,9 @@ genomes = [
 
 rule all:
     input:
-        "results/orthofinder/Orthogroups.tsv",
-        expand("results/resistify/{genome}/results.tsv", genome = genomes)
+        "results/orthofinder/Phylogenetic_Hierarchical_Orthogroups/N0.tsv,
+        expand("results/resistify/{genome}/results.tsv", genome = genomes),
+        expand("results/edta/{genome}.gff", genome = genomes),
 
 rule helixer:
     input:
@@ -123,13 +120,40 @@ rule orthofinder:
     input:
         expand("results/peptide/{genome}.fa", genome = genomes)
     output:
-        "results/orthofinder/Orthogroups.tsv"
+        "results/orthofinder/Phylogenetic_Hierarchical_Orthogroups/N0.tsv
     conda:
         "envs/orthofinder.yml"
     threads: 16
     resources:
-        mem_mb = 32000
+        mem_mb = 32000,
+        partition = "medium"
     shell:
         """
-        orthofinder -t 16 -f results/peptide
+        rm -rf results/orthofinder
+        mkdir -p results/orthofinder
+        # orthofinder does some really stupid directory naming so have to do this
+        orthofinder -t 16 -f results/peptide -o $TMPDIR/temp_orthofinder
+        mv $TMPDIR/temp_orthofinder/*/* results/orthofinder
+        rm -r $TMPDIR/temp_orthofinder
+        """
+
+rule edta:
+    input:
+        genome = "genomes/{genome}.fa"
+    output:
+        "results/edta/{genome}.gff"
+    conda:
+        "envs/edta.yml"
+    threads: 8
+    resources:
+        mem_mb = 16000,
+        partition = "long"
+    shell:
+        """
+        mkdir -p results/edta/{wildcards.genome}
+        cd results/edta/{wildcards.genome}
+        EDTA.pl \
+        --genome {input.genome} \
+        --anno 1 \
+        --overwrite 1
         """
