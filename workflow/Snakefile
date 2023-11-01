@@ -24,9 +24,9 @@ genomes = [
 
 rule all:
     input:
-        "results/orthofinder/Phylogenetic_Hierarchical_Orthogroups/N0.tsv,
+        "results/orthofinder/Phylogenetic_Hierarchical_Orthogroups/N0.tsv",
         expand("results/resistify/{genome}/results.tsv", genome = genomes),
-        expand("results/edta/{genome}.gff", genome = genomes),
+        expand("results/edta/{genome}.mod.EDTA.TEanno.gff3", genome = genomes),
 
 rule helixer:
     input:
@@ -120,7 +120,7 @@ rule orthofinder:
     input:
         expand("results/peptide/{genome}.fa", genome = genomes)
     output:
-        "results/orthofinder/Phylogenetic_Hierarchical_Orthogroups/N0.tsv
+        "results/orthofinder/Phylogenetic_Hierarchical_Orthogroups/N0.tsv"
     conda:
         "envs/orthofinder.yml"
     threads: 16
@@ -141,7 +141,7 @@ rule edta:
     input:
         genome = "genomes/{genome}.fa"
     output:
-        "results/edta/{genome}.gff"
+        "results/edta/{genome}.mod.EDTA.TEanno.gff3"
     conda:
         "envs/edta.yml"
     threads: 8
@@ -150,10 +150,12 @@ rule edta:
         partition = "long"
     shell:
         """
-        mkdir -p results/edta/{wildcards.genome}
-        cd results/edta/{wildcards.genome}
-        EDTA.pl \
-        --genome {input.genome} \
+        mkdir -p results/edta
+        cp {input.genome} results/edta/{wildcards.genome}
+        cd results/edta
+        perl ../../EDTA.pl \
+        --threads {threads} \
+        --genome {wildcards.genome} \
         --anno 1 \
         --overwrite 1
         """
