@@ -1,6 +1,7 @@
 from Bio import SeqIO
 
 genomes = [
+    "annuum",
     "candolleanum",
     "etuberosum",
     "lycopersicum",
@@ -151,11 +152,11 @@ rule edta:
     shell:
         """
         mkdir -p results/edta
-        cp {input.genome} results/edta/{wildcards.genome}
+        cp {input.genome} $TMPDIR/{wildcards.genome}
         cd results/edta
-        perl ../../EDTA.pl \
+        perl ../../EDTA/EDTA.pl \
         --threads {threads} \
-        --genome {wildcards.genome} \
+        --genome $TMPDIR/{wildcards.genome} \
         --anno 1 \
         --overwrite 1
         """
