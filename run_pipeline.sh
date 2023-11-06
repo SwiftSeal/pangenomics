@@ -7,5 +7,5 @@
 #SBATCH --export=ALL
 #SBATCH -o snakemake.%j.out
 #SBATCH -e snakemake.%j.err
-
-mamba run -n snakemake snakemake --profile ~/.config/snakemake/slurm
+source activate snakemake
+snakemake --profile ~/.config/snakemake/slurm

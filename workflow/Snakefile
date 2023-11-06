@@ -147,16 +147,19 @@ rule edta:
         "envs/edta.yml"
     threads: 8
     resources:
-        mem_mb = 16000,
+        mem_mb = 64000,
         partition = "long"
     shell:
         """
-        mkdir -p results/edta
+        # get absolute path of EDTA.pl
+        EDTA_PATH=$(readlink -f EDTA/EDTA.pl)
         cp {input.genome} $TMPDIR/{wildcards.genome}
-        cd results/edta
-        perl ../../EDTA/EDTA.pl \
+        cd $TMPDIR
+        perl $EDTA_PATH \
         --threads {threads} \
-        --genome $TMPDIR/{wildcards.genome} \
+        --genome {wildcards.genome} \
         --anno 1 \
         --overwrite 1
+        cd -
+        cp -r $TMPDIR/{wildcards.genome}* results/edta
         """
