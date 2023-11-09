@@ -3,9 +3,15 @@ library(gggenes)
 library(ggplot2)
 library(cowplot)
 library(dplyr)
+library(readr)
 library(purrr)
+library(stringr)
+library(tidyr)
 
-nice_names <- c(
+# Configuration
+
+genomes <- c(
+    #"annuum" = "C. annuum",
     "candolleanum" = "S. candolleanum",
     "etuberosum" = "S. etuberosum",
     "lycopersicum" = "S. lycopersicum",
@@ -14,7 +20,7 @@ nice_names <- c(
     "chilense" = "S. chilense",
     "galapagense" = "S. galapagense",
     "neorickii" = "S. neorickii",
-    "tuberosum_phureja_E86_69" = "S. tuberosum\n(phureja E86-69)",
+    #"tuberosum_phureja_E86_69" = "S. tuberosum\n(phureja E86-69)",
     "tuberosum_tuberosum_RH" = "S. tuberosum\n(tuberosum RH)",
     "chmielewskii" = "S. chmielewskii",
     "habrochaites" = "S. habrochaites",
@@ -27,21 +33,116 @@ nice_names <- c(
     "tuberosum_stenotomum_PG6359" = "S. tuberosum\n(stenotomum PG6359)"
 )
 
-# colours
-# plot styling
-paired_colours = c("#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99", "#e31a1c", "#fdbf6f", "#ff7f00")
-# load the tree
-tree <- read.tree("results/results/SpeciesTree_rooted.txt")
-
-# load the resistify results
-genomes <- list.dirs("results/resistify", recursive = FALSE)
-resistify <- map(genomes, ~ read.table(paste0(.x, "/results.tsv"), header = TRUE) %>%
-    mutate(Genome = basename(.x))
+tuberising <- c(
+    #"annuum" = FALSE,
+    "candolleanum" = TRUE,
+    "etuberosum" = FALSE,
+    "lycopersicum" = FALSE,
+    "tuberosum_phureja_E4_63" = TRUE,
+    "tuberosum_tuberosum_RH10_15" = TRUE,
+    "chilense" = FALSE,
+    "galapagense" = FALSE,
+    "neorickii" = FALSE,
+    #"tuberosum_phureja_E86_69" = TRUE,
+    "tuberosum_tuberosum_RH" = TRUE,
+    "chmielewskii" = FALSE,
+    "habrochaites" = FALSE,
+    "peruvianum" = FALSE,
+    "tuberosum_stenotomum_A6_26" = TRUE,
+    "verrucosum" = TRUE,
+    "corneliomulleri" = FALSE,
+    "lycopersicoides" = FALSE,
+    "pimpinellifolium" = FALSE,
+    "tuberosum_stenotomum_PG6359" = TRUE
 )
-resistify <- bind_rows(resistify)
-resistify_summary <- resistify %>%
-    group_by(Genome, Classification) %>%
-    summarise(count = n())
+
+paired_colours = c("#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99", "#e31a1c", "#fdbf6f", "#ff7f00")
+nice_colours = c("#2596be", "#ff7f0e", "#2ca02c", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf")
+
+nice_theme <- theme(
+  axis.text.y = element_blank(),
+  axis.ticks.y = element_blank(),
+  axis.title.y = element_blank(),
+
+  strip.text = element_blank())
+
+# Import data
+
+## Merge all resistify results into a single dataframe
+resistify <- map(names(genomes), ~ read.table(paste0("results/resistify/", .x, "/results.tsv"), header = TRUE) %>% mutate(genome = .x)) %>%
+  bind_rows()
+
+## Orthofinder tree
+genome_tree <- read.tree("results/orthofinder/Species_Tree/SpeciesTree_rooted.txt")
+
+## EDTA calculated % of TE content
+te_content <- map(names(genomes), ~ read.table(paste0("results/edta/", .x, ".mod.EDTA.TEanno.sum"), skip = 6, fill = TRUE, nrows = 12, col.names = c("te_classification", "te_count", "te_masked_bp", "percentage")) %>% filter(te_count != "--") %>%  mutate(genome = .x, percentage = as.numeric(str_remove(percentage, "%")))) %>%
+  bind_rows()
+
+orthogroups <- read.table("results/orthofinder/Phylogenetic_Hierarchical_Orthogroups/N0.tsv", sep = "\t", header = TRUE) %>%
+  pivot_longer(!1:3, names_to = "genome", values_to = "gene") %>%
+  separate_rows(gene, sep = ", ")
+
+# Analysis
+
+summarise(group_by(resistify, genome), count = n()) %>%
+  mutate(tuberising = tuberising[match(genome, names(tuberising))]) %>%
+  ggplot(aes(x = tuberising, y = count)) +
+  geom_boxplot(fill = nice_colours[1]) +
+  theme(
+    panel.grid = element_blank(),
+    panel.background = element_rect(fill = "white", colour = "black"))
+
+association_plot <- inner_join(
+           te_content,
+           summarise(group_by(resistify, genome), count = n()),
+           by = "genome") %>%
+  filter(te_classification != "unknown") %>%
+  mutate(tuberising = tuberising[match(genome, names(tuberising))]) %>%
+  ggplot(aes(x = percentage, y = count, colour = tuberising)) +
+  geom_point() +
+  facet_wrap(~ te_classification, scales = "free_x") +
+  theme(
+    legend.position = c(0.84, 0.15),
+    panel.grid = element_blank(),
+    panel.background = element_rect(fill = "white", colour = "black"),
+    strip.background = element_blank()) +
+  labs(x = "TE content (%)", y = "Number of resistance genes") +
+  scale_colour_manual(values = nice_colours)
+
+ggsave("association_plot.png", association_plot, width = 4, height = 4, units = "in")
+
+## NLR orthogroups
+
+orthogroup_histogram_plot <- orthogroups %>%
+  filter(gene %in% resistify$Sequence) %>%
+  group_by(genome, OG) %>%
+  summarise(count = n()) %>%
+  group_by(OG) %>%
+  summarise(count = n()) %>%
+  ggplot(aes(x = count)) +
+  geom_bar(fill = nice_colours[1]) +
+  theme(
+    panel.grid = element_blank(),
+    panel.background = element_rect(fill = "white", colour = "black")) +
+  labs(x = "Number of genomes", y = "Number of orthogroups")
+
+ggsave("orthogroup_histogram.png", orthogroup_histogram_plot, width = 2, height = 2, units = "in")
+
+orthogroup_classification <- resistify %>%
+  left_join(orthogroups, by = c("Sequence" = "gene")) %>%
+  group_by(Classification) %>%
+  summarise(count = n_distinct(OG)) %>%
+  ggplot(aes(x = Classification, y = count, fill = Classification)) +
+  geom_bar(stat = "identity") +
+    theme(
+        panel.grid = element_blank(),
+        panel.background = element_rect(fill = "white", colour = "black"),
+        legend.position = "none") +
+  labs(x = "Classification", y = "Number of orthogroups") +
+  scale_fill_manual(values = paired_colours)
+
+ggsave("orthogroup_classification.png", orthogroup_classification, width = 2, height = 2, units = "in")
 
 # of the CNLs, how many are True for MADA?
 resistify %>%
@@ -96,5 +197,3 @@ merged_plot <- plot_grid(tree_plot,
                          rel_widths = c(1, 0.7, 3))
 
 ggsave("results/plot.png", merged_plot, width = 6, height = 6, units = "in")
-
-

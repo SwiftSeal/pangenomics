@@ -163,3 +163,27 @@ rule edta:
         cd -
         cp -r $TMPDIR/{wildcards.genome}* results/edta
         """
+
+rule retrieve_bed:
+    input:
+        resistify = "results/resistify/{genome}/results.tsv",
+        gff = "results/helixer/{genome}.gff"
+    output:
+        output = "results/nlr_bed/{genome}.bed"
+    run:
+        # get set of genes that are classified as NLR
+        with open(input.resistify) as infile:
+            nlrs = set()
+            # skip header
+            infile.readline()
+            for line in infile:
+                line = line.strip().split("\t")
+                nlrs.add(line[0].split(".")[0])
+
+        with open(input.gff) as infile, open(output.output, "w") as outfile:
+            for line in infile:
+                line = line.strip().split("\t")
+                if line[2] == "gene":
+                    gene = line[8].split(";")[0].split("=")[1]
+                    if gene in nlrs:
+                        outfile.write(f"{line[0]}\t{line[3]}\t{line[4]}\t{gene}\n")
