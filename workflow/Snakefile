@@ -187,3 +187,5 @@ rule retrieve_bed:
                     gene = line[8].split(";")[0].split("=")[1]
                     if gene in nlrs:
                         outfile.write(f"{line[0]}\t{line[3]}\t{line[4]}\t{gene}\n")
+
+rule 
