@@ -28,6 +28,7 @@ rule all:
         "results/orthofinder/Phylogenetic_Hierarchical_Orthogroups/N0.tsv",
         expand("results/resistify/{genome}/results.tsv", genome = genomes),
         expand("results/edta/{genome}.mod.EDTA.TEanno.gff3", genome = genomes),
+        expand("results/intersect/{genome}.bed", genome = genomes)
 
 rule helixer:
     input:
