@@ -28,7 +28,8 @@ rule all:
         "results/orthofinder/Phylogenetic_Hierarchical_Orthogroups/N0.tsv",
         expand("results/resistify/{genome}/results.tsv", genome = genomes),
         expand("results/edta/{genome}.mod.EDTA.TEanno.gff3", genome = genomes),
-        expand("results/intersect/{genome}.bed", genome = genomes)
+        expand("results/intersect/{genome}.bed", genome = genomes),
+        expand("results/edta/{genome}_intact_terminal.tsv", genome = genomes)
 
 rule helixer:
     input:
@@ -186,3 +187,21 @@ rule bed_intersect:
     shell:
         "bedtools intersect -f 0.9 -wo -a {input.gene_bed} -b {input.edta_gff} > {output}"
     
+rule extract_te_terminal:
+    input:
+        fasta = "results/edta/{genome}.mod.EDTA.final/{genome}.mod.EDTA.intact.fa"
+    output:
+        table = "results/edta/{genome}_intact_terminal.tsv"
+    run:
+        with open(input.fasta, "r") as infile, open(output.table, "w") as outfile:
+            for record in SeqIO.parse(infile, "fasta"):
+                # extract 30bp from the start and end of the sequence
+                try:
+                    start = record.seq[:30]
+                    end = record.seq[-30:]
+                    outfile.write(f"{record.id}\t{start}\t{end}\n")
+                except IndexError:
+                    # if sequence is less than 60bp, ignore it
+                    pass
+                
+        
