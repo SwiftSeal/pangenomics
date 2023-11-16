@@ -1,6 +1,7 @@
 library(ggtree)
 library(gggenes)
 library(ggplot2)
+library(ggseqlogo)
 library(cowplot)
 library(dplyr)
 library(readr)
@@ -85,22 +86,35 @@ orthogroups <- read.table("results/orthofinder/Phylogenetic_Hierarchical_Orthogr
   separate_rows(gene, sep = ", ")
 
 ## Helixer gff
-helixer_gff <- map(names(genomes), ~ read.table(paste0("results/helixer/", .x, ".gff")) %>% select(c(V3,V9)) %>% filter(V3 == "exon") %>% mutate(genome = .x)) %>%
-  bind_rows()
-
-helixer_summary <- helixer_gff %>%
-  mutate(gene_id = str_extract(V9, "Parent=(([^;]+))")) %>%
-  mutate(gene_id = str_replace(gene_id, "Parent=", "")) %>%
-  group_by(genome, gene_id) %>%
-  summarise(count = n())
-
-ggplot(helixer_summary, aes(y = count, fill = genome)) +
-  geom_boxplot()
+#helixer_gff <- map(names(genomes), ~ read.table(paste0("results/helixer/", .x, ".gff")) %>% select(c(V3,V9)) %>% filter(V3 == "exon") %>% mutate(genome = .x)) %>%
+#  bind_rows()
+#
+#helixer_summary <- helixer_gff %>%
+#  mutate(gene_id = str_extract(V9, "Parent=(([^;]+))")) %>%
+#  mutate(gene_id = str_replace(gene_id, "Parent=", "")) %>%
+#  group_by(genome, gene_id) %>%
+#  summarise(count = n())
+#
+#ggplot(helixer_summary, aes(y = count, fill = genome)) +
+#  geom_boxplot()
 
 ## Overlaps
 
 te_overlap <- map(names(genomes), ~ read.table(paste0("results/intersect/", .x, ".bed")) %>% mutate(genome = .x)) %>%
   bind_rows()
+
+te_overlap <- te_overlap %>%
+  mutate(te_id = str_extract(V21, "Name=(([^;]+))", group = 1)) %>%
+  mutate(te_type = V15, gene = V4) %>%
+  select(genome, te_id, te_type, gene)
+
+## TE terminal motifs
+
+te_terminal_motifs <- map(names(genomes), ~ read.table(paste0("results/edta/", .x, "_intact_terminal.tsv"), sep = "\t", comment.char = "") %>% mutate(genome = .x)) %>%
+  bind_rows()
+
+te_terminal_motifs <- te_terminal_motifs %>%
+  mutate(te_id = str_remove(V1, "\\|.*"))
 
 # Analysis
 
@@ -228,8 +242,33 @@ ggsave("results/plot.png", merged_plot, width = 6, height = 6, units = "in")
 
 ## Overlap analysis
 
-te_overlap %>%
-  filter(V4 %in% resistify$Sequence) %>%
-  ggplot(aes(y = genome, fill = V15)) +
-    geom_bar()
+overlapping_helitron <- te_overlap %>%
+  filter(gene %in% resistify$Sequence) %>%
+  filter(te_type == "helitron") %>%
+  select(te_id, genome) %>%
+  distinct() %>%
+  left_join(te_terminal_motifs, by = join_by(genome, te_id))
 
+overlapping_plot <- te_overlap %>%
+  filter(gene %in% resistify$Sequence) %>%
+  filter(te_type != "repeat_region") %>%
+  group_by(genome, te_type) %>%
+  summarise(count = n()) %>%
+  ggplot(aes(y = genome, x = count, fill = te_type)) +
+  geom_bar(stat = "identity") +
+  theme(
+    panel.grid = element_blank(),
+    panel.background = element_rect(fill = "white", colour = "black")) +
+  labs(y = "Genome", x = "Number of overlapping TEs") +
+  scale_fill_manual(values = nice_colours)
+
+ggsave("overlap.png", overlapping_plot, width = 6, height = 3, units = "in")
+
+
+
+helitron_start <- ggseqlogo(overlapping_helitron$V2)
+helitron_end <- ggseqlogo(overlapping_helitron$V3)
+
+ggsave("motifs.png", plot_grid(helitron_start, helitron_end, nrow = 2), width = 4, height = 2, units = "in")
+
+## motif analysis

@@ -29,7 +29,8 @@ rule all:
         expand("results/resistify/{genome}/results.tsv", genome = genomes),
         expand("results/edta/{genome}.mod.EDTA.TEanno.gff3", genome = genomes),
         expand("results/intersect/{genome}.bed", genome = genomes),
-        expand("results/edta/{genome}_intact_terminal.tsv", genome = genomes)
+        expand("results/edta/{genome}_intact_terminal.tsv", genome = genomes),
+        expand("results/refplantnlr/{genome}.txt", genome = genomes)
 
 rule helixer:
     input:
@@ -204,4 +205,17 @@ rule extract_te_terminal:
                     # if sequence is less than 60bp, ignore it
                     pass
                 
-        
+rule refplantnlr_blast:
+    input:
+        peptide = "results/peptide/{genome}.fa",
+        refplantnlr = "refplantnlr.fa"
+    output:
+        result = "results/refplantnlr/{genome}.txt"
+    conda:
+        "envs/blast.yml"
+    threads: 1
+    resources:
+        mem_mb = 4000,
+        partition = "short"
+    shell:
+        "blastp -query {input.peptide} -subject {input.refplantnlr} -outfmt 6 -out {output.result}"
