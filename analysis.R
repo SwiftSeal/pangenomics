@@ -8,6 +8,8 @@ library(readr)
 library(purrr)
 library(stringr)
 library(tidyr)
+library(ComplexHeatmap)
+library(GenomicRanges)
 
 # Configuration
 
@@ -57,6 +59,49 @@ tuberising <- c(
     "tuberosum_stenotomum_PG6359" = TRUE
 )
 
+refplantnlr_genomes <- c(
+  "Ty-2" = "habrochaites",
+  "Ptr1" = "lycopersicoides",
+  "Bs4" = "lycopersicum",
+  "CNL-11990" = "lycopersicum",
+  "Hero-A" = "lycopersicum",
+  "I2" = "lycopersicum",
+  "Mi-1" = "lycopersicum",
+  "NRC0" = "lycopersicum",
+  "NRC1" = "lycopersicum",
+  "NRC2" = "lycopersicum",
+  "NRC3" = "lycopersicum",
+  "NRC4a" = "lycopersicum",
+  "NRC4b" = "lycopersicum",
+  "NRC6" = "lycopersicum",
+  "Rx4" = "lycopersicum",
+  "Tm2" = "lycopersicum",
+  "tm2_sus" = "lycopersicum",
+  "Tm2-nv" = "lycopersicum",
+  "Tm2^2" = "lycopersicum",
+  "Prf" = "lycopersicum",
+  "Sw5-b" = "lycopersicum",
+  "Ph-3" = "pimpinellifolium",
+  "SpNBS-LRR" = "pimpinellifolium",
+  "Gpa2" = "tuberosum_tuberosum_RH10_15",
+  "Gro1-4" = "tuberosum_tuberosum_RH10_15",
+  "R3a" = "tuberosum_tuberosum_RH10_15",
+  "Rx" = "tuberosum_tuberosum_RH10_15",
+  "StrPtr1" = "tuberosum_tuberosum_RH10_15"
+)
+
+transposable_elements <- c(
+"CACTA_TIR_transposon" = "TIR",
+"Copia_LTR_retrotransposon" = "LTR",
+"Gypsy_LTR_retrotransposon" = "LTR",
+"hAT_TIR_transposon" = "TIR",
+"helitron" = "Helitron",
+"LTR_retrotransposon" = "LTR",
+"Mutator_TIR_transposon" = "TIR",
+"PIF_Harbinger_TIR_transposon" = "TIR",
+"Tc1_Mariner_TIR_transposon" = "TIR"
+)
+
 paired_colours = c("#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99", "#e31a1c", "#fdbf6f", "#ff7f00")
 nice_colours = c("#2596be", "#ff7f0e", "#2ca02c", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf")
 
@@ -85,18 +130,29 @@ orthogroups <- read.table("results/orthofinder/Phylogenetic_Hierarchical_Orthogr
   pivot_longer(!1:3, names_to = "genome", values_to = "gene") %>%
   separate_rows(gene, sep = ", ")
 
-## Helixer gff
-#helixer_gff <- map(names(genomes), ~ read.table(paste0("results/helixer/", .x, ".gff")) %>% select(c(V3,V9)) %>% filter(V3 == "exon") %>% mutate(genome = .x)) %>%
-#  bind_rows()
-#
-#helixer_summary <- helixer_gff %>%
-#  mutate(gene_id = str_extract(V9, "Parent=(([^;]+))")) %>%
-#  mutate(gene_id = str_replace(gene_id, "Parent=", "")) %>%
-#  group_by(genome, gene_id) %>%
-#  summarise(count = n())
-#
-#ggplot(helixer_summary, aes(y = count, fill = genome)) +
-#  geom_boxplot()
+## Refplantnlr blast results
+
+refplantnlr <- map(names(genomes), ~ read.table(paste0("results/refplantnlr/", .x, ".txt"), sep = "\t") %>% mutate(genome = .x)) %>%
+  bind_rows()
+
+## Helixer bed
+
+helixer_bed <- map(names(genomes), ~ read.table(paste0("results/helixer/", .x, ".bed")) %>% mutate(genome = .x)) %>%
+  bind_rows()
+
+## genome size
+
+genome_size <- data.frame(genome = character(), Total_Length = numeric(), stringsAsFactors = FALSE)
+for (genome in names(genomes)) {
+  # Read the fourth line from the file
+  total_length_line <- readLines(paste0("results/edta/", genome, ".mod.EDTA.TEanno.sum"), n = 4)[4]
+
+  # Extract the numeric value using regular expression
+  total_length <- as.numeric(regmatches(total_length_line, regexpr("\\d+", total_length_line)))
+
+  # Add the results to the data frame
+  genome_size <- rbind(genome_size, data.frame(genome = genome, Total_Length = total_length, stringsAsFactors = FALSE))
+}
 
 ## Overlaps
 
@@ -116,7 +172,35 @@ te_terminal_motifs <- map(names(genomes), ~ read.table(paste0("results/edta/", .
 te_terminal_motifs <- te_terminal_motifs %>%
   mutate(te_id = str_remove(V1, "\\|.*"))
 
+## TE intact gff
+
+te_intact_gff <- map(names(genomes), ~ read.table(paste0("results/edta/", .x, ".mod.EDTA.intact.gff3"), sep = "\t", comment.char = "") %>% mutate(genome = .x)) %>%
+  bind_rows()
+
 # Analysis
+
+genome_summary <- helixer_bed %>%
+  group_by(genome) %>%
+  summarise(count = n()) %>%
+  left_join(genome_size, by = "genome")
+
+genome_summary <- te_content %>%
+  group_by(genome) %>%
+  summarise(te_percentage = sum(percentage)) %>%
+  left_join(genome_summary, by = "genome")
+
+genome_summary <- te_intact_gff %>%
+  filter(V3 %in% names(transposable_elements)) %>%
+  group_by(genome) %>%
+  summarise(intact_te_count = n()) %>%
+  left_join(genome_summary, by = "genome")
+
+genome_summary <- genome_summary %>%
+  mutate(tuberising = tuberising[match(genome, names(tuberising))])
+
+write.table(genome_summary, "results/genome_summary.tsv", sep = "\t", quote = FALSE, row.names = FALSE)
+
+summary(lm(intact_te_count ~ tuberising, data = genome_summary))
 
 summarise(group_by(resistify, genome), count = n()) %>%
   mutate(tuberising = tuberising[match(genome, names(tuberising))]) %>%
@@ -126,7 +210,7 @@ summarise(group_by(resistify, genome), count = n()) %>%
     panel.grid = element_blank(),
     panel.background = element_rect(fill = "white", colour = "black"))
 
-association_plot <- inner_join(
+te_association_plot <- inner_join(
            te_content,
            summarise(group_by(resistify, genome), count = n()),
            by = "genome") %>%
@@ -143,7 +227,33 @@ association_plot <- inner_join(
   labs(x = "TE content (%)", y = "Number of resistance genes") +
   scale_colour_manual(values = nice_colours)
 
-ggsave("association_plot.png", association_plot, width = 4, height = 4, units = "in")
+ggsave("te_association_plot.png", association_plot, width = 4, height = 4, units = "in")
+
+## How many overlapping TEs are there in each genome?
+test <- te_overlap %>%
+  filter(te_type %in% names(transposable_elements)) %>%
+  group_by(genome) %>%
+  summarise("Total TE overlaps (# NLR)" = paste(n(), " (", sum(gene %in% resistify$Sequence), ")", sep = ""))
+
+test <- te_content %>%
+  group_by(genome) %>%
+  summarise("% TE" = sum(percentage)) %>%
+  left_join(test, by = "genome")
+
+#te_content %>%
+#  group_by(genome) %>%
+#  summarise(te_percentage = sum(percentage)) %>%
+#  mutate(tuberising = tuberising[match(genome, names(tuberising))]) %>%
+#  ggplot(aes(x = tuberising, y = te_percentage)) +
+#  geom_boxplot()
+#
+#test <- te_content %>%
+#  filter(genome != "annuum") %>%
+#  group_by(genome) %>%
+#  summarise(te_percentage = sum(percentage)) %>%
+#  mutate(tuberising = tuberising[match(genome, names(tuberising))])
+#
+#t.test(te_percentage ~ tuberising, data = test)
 
 ## NLR orthogroups
 
@@ -160,8 +270,6 @@ orthogroup_histogram_plot <- orthogroups %>%
     panel.background = element_rect(fill = "white", colour = "black")) +
   labs(x = "Number of genomes", y = "Number of orthogroups")
 
-ggsave("orthogroup_histogram.png", orthogroup_histogram_plot, width = 2, height = 2, units = "in")
-
 orthogroup_classification <- resistify %>%
   left_join(orthogroups, by = c("Sequence" = "gene")) %>%
   group_by(Classification) %>%
@@ -170,12 +278,54 @@ orthogroup_classification <- resistify %>%
   geom_bar(stat = "identity") +
     theme(
         panel.grid = element_blank(),
-        panel.background = element_rect(fill = "white", colour = "black"),
-        legend.position = "none") +
+        panel.background = element_rect(fill = "white", colour = "black")) +
   labs(x = "Classification", y = "Number of orthogroups") +
   scale_fill_manual(values = paired_colours)
 
-ggsave("orthogroup_classification.png", orthogroup_classification, width = 2, height = 2, units = "in")
+ggsave("orthogroups.png", plot_grid(orthogroup_histogram_plot, orthogroup_classification, ncol = 2, rel_widths = c(1, 2)), width = 6, height = 3, units = "in")
+
+filtered_bed <- helixer_bed %>%
+  filter(V4 %in% resistify$Sequence)
+
+calculate_cluster_counts <- function(genome_name, maxgap_value) {
+  # Subset the data for the current genome
+  subsetted <- filtered_bed %>% filter(genome == genome_name)
+
+  # Create a GRanges object
+  subsetted_granges <- GRanges(seqnames = subsetted$V1, ranges = IRanges(start = subsetted$V2, end = subsetted$V3), strand = subsetted$V6)
+
+  # Find overlaps within the specified maxgap
+  overlaps <- findOverlaps(subsetted_granges, subsetted_granges, maxgap = maxgap_value, ignore.strand = TRUE)
+
+  # Extract clusters from the overlaps
+  cluster <- split(queryHits(overlaps), subjectHits(overlaps))
+
+  # Count the clusters
+  clusters_gt2 <- sum(lengths(cluster) > 2)
+  clusters_eq2 <- sum(lengths(cluster) == 2)
+  clusters_eq1 <- sum(lengths(cluster) == 1)
+
+  # Create a data frame with the results
+  result <- data.frame(genome = genome_name, maxgap = maxgap_value, cluster_status = c("cluster", "pair", "singleton"), count = c(clusters_gt2, clusters_eq2, clusters_eq1), stringsAsFactors = FALSE)
+
+  return(result)
+}
+
+result_df <- data.frame(genome = character(), maxgap = numeric(), cluster_status = character(), count = numeric(), stringsAsFactors = FALSE)
+
+for (genome_name in names(genomes)) {
+  for (maxgap_value in seq(0, 200000, by = 10000)) {
+    # Calculate cluster counts for the current genome and maxgap
+    counts <- calculate_cluster_counts(genome_name, maxgap_value)
+
+    # Append the results to the main data frame
+    result_df <- bind_rows(result_df, counts)
+  }
+}
+
+ggplot(result_df, aes(x = maxgap, y = count, fill = cluster_status)) +
+  geom_bar(position = "fill", stat = "identity") +
+  facet_wrap(~ genome)
 
 # of the CNLs, how many are True for MADA?
 #resistify %>%
@@ -242,12 +392,12 @@ ggsave("results/plot.png", merged_plot, width = 6, height = 6, units = "in")
 
 ## Overlap analysis
 
-overlapping_helitron <- te_overlap %>%
-  filter(gene %in% resistify$Sequence) %>%
-  filter(te_type == "helitron") %>%
-  select(te_id, genome) %>%
-  distinct() %>%
-  left_join(te_terminal_motifs, by = join_by(genome, te_id))
+#te_overlap %>%
+#  filter(te_type %in% names(transposable_elements)) %>%
+#  mutate(te_type = transposable_elements[te_type]) %>%
+#  group_by(genome, te_type) %>%
+#  ggplot(aes(y = genome, fill = te_type)) +
+#  geom_bar()
 
 overlapping_plot <- te_overlap %>%
   filter(gene %in% resistify$Sequence) %>%
@@ -262,13 +412,52 @@ overlapping_plot <- te_overlap %>%
   labs(y = "Genome", x = "Number of overlapping TEs") +
   scale_fill_manual(values = nice_colours)
 
+helitron_resistify <- resistify %>%
+  filter(Sequence %in% te_overlap$gene)
+
 ggsave("overlap.png", overlapping_plot, width = 6, height = 3, units = "in")
 
+overlapping_helitron_motifs <- te_overlap %>%
+  filter(gene %in% resistify$Sequence) %>%
+  filter(te_type == "helitron") %>%
+  select(te_id, genome) %>%
+  distinct() %>%
+  left_join(te_terminal_motifs, by = join_by(genome, te_id))
 
-
-helitron_start <- ggseqlogo(overlapping_helitron$V2)
-helitron_end <- ggseqlogo(overlapping_helitron$V3)
+helitron_start <- ggseqlogo(overlapping_helitron_motifs$V2)
+helitron_end <- ggseqlogo(overlapping_helitron_motifs$V3)
 
 ggsave("motifs.png", plot_grid(helitron_start, helitron_end, nrow = 2), width = 4, height = 2, units = "in")
 
-## motif analysis
+## known NLR analysis
+
+refplantnlr_genomes[match("Bs4", names(refplantnlr_genomes))]
+
+## Filter to only the best hit for each genome
+filtered_refplantnlr <- refplantnlr %>%
+  filter(V1 %in% names(refplantnlr_genomes)) %>%
+  filter(genome == refplantnlr_genomes[V1]) %>%
+  group_by(V1) %>%
+  filter(V12 == max(V12)) %>%
+  select(V1, V2, V3, V12, genome) %>%
+  rename(refplantnlr_gene = V1, gene = V2, percent_identity = V3, bitscore = V12, genome = genome)
+
+filtered_refplantnlr <- filtered_refplantnlr %>%
+  left_join(orthogroups, by = join_by(gene)) %>%
+  select(-HOG, -Gene.Tree.Parent.Clade, -genome.y) %>%
+  rename(genome = genome.x)
+
+test <- orthogroups %>%
+  # get the orthogroups we're interested in
+  filter(OG %in% filtered_refplantnlr$OG) %>%
+  # for each orthogroup, count the number of members in each genome
+  group_by(OG, genome) %>%
+  summarise(count = n()) %>%
+  select(OG, genome, count) %>%
+  pivot_wider(names_from = genome, values_from = count, values_fill = 0) %>%
+  right_join(filtered_refplantnlr, by = join_by(OG))
+
+write.table(test, "results/refplantnlr_summary.tsv", sep = "\t", quote = FALSE, row.names = FALSE)
+
+test %>%
+  pivot_longer(!c(OG, refplantnlr_gene, gene, percent_identity, bitscore, genome), names_to = "genome", values_to = "count")
