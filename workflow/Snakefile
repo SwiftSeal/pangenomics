@@ -218,4 +218,4 @@ rule refplantnlr_blast:
         mem_mb = 4000,
         partition = "short"
     shell:
-        "blastp -query {input.peptide} -subject {input.refplantnlr} -outfmt 6 -out {output.result}"
+        "blastp -subject {input.peptide} -query {input.refplantnlr} -outfmt 6 -out {output.result}"
