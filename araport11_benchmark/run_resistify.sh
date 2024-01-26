@@ -7,4 +7,4 @@
 
 source activate resistify
 
-resistify refplantnlr.fa resistify_result
+resistify representative_notstop.fa resistify_result
