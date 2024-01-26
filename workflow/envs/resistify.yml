@@ -1,8 +1,4 @@
 channels:
  - bioconda
 dependencies:
- - python==3.9
- - scikit-learn==0.24.2
- - hmmer
- - pip:
-   - resistify
+ - resistify
