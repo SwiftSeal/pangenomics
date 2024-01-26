@@ -164,7 +164,10 @@ rule edta:
         --anno 1 \
         --overwrite 1
         cd -
-        cp -r $TMPDIR/{wildcards.genome}* results/edta
+        cp -r $TMPDIR/{wildcards.genome}.mod.EDTA.intact.gff3 results/edta
+        cp -r $TMPDIR/{wildcards.genome}.mod.EDTA.intact.fa results/edta
+        cp -r $TMPDIR/{wildcards.genome}.mod.EDTA.TEanno.gff3 results/edta
+        cp -r $TMPDIR/{wildcards.genome}..mod.EDTA.TEanno.sum results/edta
         """
 
 rule retrieve_bed:
