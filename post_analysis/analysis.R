@@ -1,14 +1,12 @@
 library(ggtree)
-library(gggenes)
 library(ggplot2)
-library(ggseqlogo)
+#library(ggseqlogo)
 library(cowplot)
 library(dplyr)
 library(readr)
 library(purrr)
 library(stringr)
 library(tidyr)
-library(ComplexHeatmap)
 library(GenomicRanges)
 
 # Configuration
@@ -121,7 +119,7 @@ resistify <- map(names(genomes), ~ read.table(paste0("results/resistify/", .x, "
 ## Orthofinder tree
 genome_tree <- read.tree("results/orthofinder/Species_Tree/SpeciesTree_rooted.txt")
 
-## EDTA calculated % of TE content
+## EDTA calculated % of TE contento
 te_content <- map(names(genomes), ~ read.table(paste0("results/edta/", .x, ".mod.EDTA.TEanno.sum"), skip = 6, fill = TRUE, nrows = 12, col.names = c("te_classification", "te_count", "te_masked_bp", "percentage")) %>% filter(te_count != "--") %>%  mutate(genome = .x, percentage = as.numeric(str_remove(percentage, "%")))) %>%
   bind_rows()
 
@@ -227,7 +225,7 @@ te_association_plot <- inner_join(
   labs(x = "TE content (%)", y = "Number of resistance genes") +
   scale_colour_manual(values = nice_colours)
 
-ggsave("te_association_plot.png", association_plot, width = 4, height = 4, units = "in")
+ggsave("results/te_association_plot.pdf", te_association_plot, width = 4, height = 4, units = "in")
 
 ## How many overlapping TEs are there in each genome?
 test <- te_overlap %>%
@@ -239,21 +237,6 @@ test <- te_content %>%
   group_by(genome) %>%
   summarise("% TE" = sum(percentage)) %>%
   left_join(test, by = "genome")
-
-#te_content %>%
-#  group_by(genome) %>%
-#  summarise(te_percentage = sum(percentage)) %>%
-#  mutate(tuberising = tuberising[match(genome, names(tuberising))]) %>%
-#  ggplot(aes(x = tuberising, y = te_percentage)) +
-#  geom_boxplot()
-#
-#test <- te_content %>%
-#  filter(genome != "annuum") %>%
-#  group_by(genome) %>%
-#  summarise(te_percentage = sum(percentage)) %>%
-#  mutate(tuberising = tuberising[match(genome, names(tuberising))])
-#
-#t.test(te_percentage ~ tuberising, data = test)
 
 ## NLR orthogroups
 
@@ -270,6 +253,24 @@ orthogroup_histogram_plot <- orthogroups %>%
     panel.background = element_rect(fill = "white", colour = "black")) +
   labs(x = "Number of genomes", y = "Number of orthogroups")
 
+# how many orthogroups are classified as N or NL?
+resistify %>%
+  left_join(orthogroups, by = c("Sequence" = "gene")) %>%
+  group_by(Classification) %>%
+  summarise(count = n_distinct(OG))
+# N: 183, NL: 188, total: 771
+
+# how many N and NL were identified by resistify?
+resistify %>%
+  filter(Classification %in% c("N", "NL")) %>%
+  summarise(count = n_distinct(Sequence))
+
+# how many in total were identified?
+resistify %>%
+  summarise(count = n_distinct(Sequence))
+
+
+
 orthogroup_classification <- resistify %>%
   left_join(orthogroups, by = c("Sequence" = "gene")) %>%
   group_by(Classification) %>%
@@ -282,7 +283,7 @@ orthogroup_classification <- resistify %>%
   labs(x = "Classification", y = "Number of orthogroups") +
   scale_fill_manual(values = paired_colours)
 
-ggsave("orthogroups.png", plot_grid(orthogroup_histogram_plot, orthogroup_classification, ncol = 2, rel_widths = c(1, 2)), width = 6, height = 3, units = "in")
+ggsave("results/orthogroups.pdf", plot_grid(orthogroup_histogram_plot, orthogroup_classification, ncol = 2, rel_widths = c(1, 2)), width = 6, height = 3, units = "in")
 
 filtered_bed <- helixer_bed %>%
   filter(V4 %in% resistify$Sequence)
@@ -388,16 +389,9 @@ merged_plot <- plot_grid(tree_plot,
                          ncol = 3,
                          rel_widths = c(1, 0.7, 3))
 
-ggsave("results/plot.png", merged_plot, width = 6, height = 6, units = "in")
+ggsave("results/plot.df", merged_plot, width = 6, height = 6, units = "in")
 
 ## Overlap analysis
-
-#te_overlap %>%
-#  filter(te_type %in% names(transposable_elements)) %>%
-#  mutate(te_type = transposable_elements[te_type]) %>%
-#  group_by(genome, te_type) %>%
-#  ggplot(aes(y = genome, fill = te_type)) +
-#  geom_bar()
 
 overlapping_plot <- te_overlap %>%
   filter(gene %in% resistify$Sequence) %>%
@@ -415,7 +409,7 @@ overlapping_plot <- te_overlap %>%
 helitron_resistify <- resistify %>%
   filter(Sequence %in% te_overlap$gene)
 
-ggsave("overlap.png", overlapping_plot, width = 6, height = 3, units = "in")
+ggsave("results/overlap.pdf", overlapping_plot, width = 6, height = 3, units = "in")
 
 overlapping_helitron_motifs <- te_overlap %>%
   filter(gene %in% resistify$Sequence) %>%
