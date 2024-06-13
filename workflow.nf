@@ -1,3 +1,5 @@
+EDTA_DIRECTORY = "/mnt/shared/scratch/msmith/apps/EDTA"
+
 process Helixer {
     container 'docker://gglyptodon/helixer-docker:helixer_v0.3.0_cuda_11.2.0-cudnn8'
     cpus 4
@@ -31,19 +33,32 @@ process GetPeptide {
     path gff
     output:
     path "${gff.baseName}.pep"
-    path "${gff.baseName}.bed"
     """
     agat_sp_extract_sequences.pl \
       --cfs \
       -g ${gff} \
       -f ${genome} \
       -p -o ${genome.baseName}.pep
+    """
+}
 
+process GetBed {
+    container 'https://depot.galaxyproject.org/singularity/agat:1.3.3--pl5321hdfd78af_0'
+    publishDir 'output'
+    cpus 1
+    memory '2 GB'
+    queue 'short'
+    script:
+    input:
+    path gff
+    output:
+    path "${gff.baseName}.gff"
+    """
     agat_convert_sp_gff2bed.pl \
       --gff ${gff} \
       -o ${gff.baseName}.bed
 
-    awk -i inplace '{{OFS="\t"; print $1, $2, $3, $4}}' ${gff.baseName}.bed
+    awk -i inplace '{{OFS="\t"; print \$1, \$2, \$3, \$4}}' ${gff.baseName}.bed
     """
 }
 
@@ -81,6 +96,7 @@ process Orthofinder {
 }
 
 process Edta {
+    conda 'edta.yml'
     scratch true
     cpus 8
     memory '32 GB'
@@ -92,8 +108,7 @@ process Edta {
     path "${genome.baseName}.TElib.fa"
     script:
     """
-    source activate edta
-    EDTA.pl \
+    ${EDTA_DIRECTORY}/EDTA.pl \
       --genome ${genome} \
       --species ${genome.baseName} \
       --threads 8 \
@@ -108,6 +123,7 @@ process EdtaBed {
     queue 'short'
     input:
     path gff
+    path library
     output:
     path "${gff.baseName}.bed"
     script:
@@ -136,11 +152,13 @@ process BedtoolsIntersect {
 
 workflow {
     model = file("/mnt/shared/home/msmith/.local/share/Helixer/models/land_plant/land_plant_v0.3_a_0080.h5")
-    genomes = Channel.fromPath("genomes/*.fna")
+    genomes = Channel.fromPath("genomes/*.fa")
 
     gff = Helixer(genomes, model)
 
     peptide = GetPeptide(gff)
+    helixerBed = GetBed(gff)
+
 
     Resistify(peptide)
 
@@ -150,5 +168,5 @@ workflow {
 
     edtaBed = EdtaBed(edta)
 
-    bedtoolsIntersect = BedtoolsIntersect(edtaBed, orthofinder.out)
+    bedtoolsIntersect = BedtoolsIntersect(helixerBed, edtaBed)
 }
