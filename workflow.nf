@@ -8,16 +8,16 @@ process Helixer {
     clusterOptions '--gpus=1'
     containerOptions '--nv'
     input:
-    path genome
+    tuple val(genome), path(fasta)
     path model
     output:
-    path "${genome.baseName}.gff"
+    tuple val(genome), path("${genome}.gff")
     script:
     """
     Helixer.py \
-      --species ${genome.baseName} \
-      --fasta-path ${genome} \
-      --gff-output-path ${genome.baseName}.gff \
+      --species ${genome} \
+      --fasta-path ${fasta} \
+      --gff-output-path ${genome}.gff \
       --model-filepath ${model} \
     """
 }
@@ -30,15 +30,15 @@ process GetPeptide {
     queue 'short'
     script:
     input:
-    path gff
+    tuple val(genome), path(gff), path(fasta)
     output:
-    path "${gff.baseName}.pep"
+    tuple val(genome), path("${genome}.pep")
     """
     agat_sp_extract_sequences.pl \
       --cfs \
       -g ${gff} \
-      -f ${genome} \
-      -p -o ${genome.baseName}.pep
+      -f ${fasta} \
+      -p -o ${genome}.pep
     """
 }
 
@@ -50,13 +50,13 @@ process GetBed {
     queue 'short'
     script:
     input:
-    path gff
+    tuple val(genome), path(gff)
     output:
-    path "${gff.baseName}.gff"
+    tuple val(genome), path("${genome}.bed")
     """
     agat_convert_sp_gff2bed.pl \
       --gff ${gff} \
-      -o ${gff.baseName}.bed
+      -o ${genome}.bed
 
     awk -i inplace '{{OFS="\t"; print \$1, \$2, \$3, \$4}}' ${gff.baseName}.bed
     """
@@ -70,12 +70,12 @@ process Resistify {
     errorStrategy { task.exitStatus == 137 ? 'retry' : 'finish' }
     maxRetries 3
     input:
-    path peptide
+    tuple val(genome), path(peptide)
     output:
-    path "${peptide.baseName}"
+    path "${genome}"
     script:
     """
-    resistify ${peptide} ${peptide.baseName}
+    resistify --threads 4 ${peptide} ${genome}
     """
 }
 
@@ -99,18 +99,17 @@ process Edta {
     conda 'edta.yml'
     scratch true
     cpus 8
-    memory '32 GB'
+    memory { 16.GB * task.attempt }
+    errorStrategy { task.exitStatus == 137 ? 'retry' : 'finish' }
     queue 'long'
     input:
-    path genome
+    tuple val(genome), path(fasta)
     output:
-    path "${genome.baseName}.TEanno.gff3"
-    path "${genome.baseName}.TElib.fa"
+    tuple val(genome), path("${genome}.TEanno.gff3"), path("${genome}.TElib.fa")
     script:
     """
     ${EDTA_DIRECTORY}/EDTA.pl \
-      --genome ${genome} \
-      --species ${genome.baseName} \
+      --genome ${fasta} \
       --threads 8 \
       --anno 1
     """
@@ -122,10 +121,9 @@ process EdtaBed {
     memory '2 GB'
     queue 'short'
     input:
-    path gff
-    path library
+    tuple val(genome), path(gff), path(library)
     output:
-    path "${gff.baseName}.bed"
+    tuple val(genome), path("${genome}.bed")
     script:
     """
     agat_convert_sp_gff2bed.pl \
@@ -134,31 +132,52 @@ process EdtaBed {
     """
 }
 
-process BedtoolsIntersect {
-    container 'quay.io/biocontainers/bedtools:2.30.0--hdb8b3b0_0'
-    cpus 1
-    memory '2 GB'
-    queue 'short'
-    input:
-    path bed1
-    path bed2
-    output:
-    path "${bed1.baseName}.intersect.${bed2.baseName}.bed"
-    script:
-    """
-    bedtools intersect -a ${bed1} -b ${bed2} > ${bed1.baseName}.intersect.${bed2.baseName}.bed
-    """
-}
+//process BedtoolsIntersect {
+//    container 'quay.io/biocontainers/bedtools:2.30.0--hdb8b3b0_0'
+//    cpus 1
+//    memory '2 GB'
+//    queue 'short'
+//    input:
+//    path bed1
+//    path bed2
+//    output:
+//    path "${bed1.baseName}.intersect.${bed2.baseName}.bed"
+//    script:
+//    """
+//    bedtools intersect -a ${bed1} -b ${bed2} > ${bed1.baseName}.intersect.${bed2.baseName}.bed
+//    """
+//}
 
 workflow {
     model = file("/mnt/shared/home/msmith/.local/share/Helixer/models/land_plant/land_plant_v0.3_a_0080.h5")
-    genomes = Channel.fromPath("genomes/*.fa")
+    genomes = Channel.of(
+      "annuum",
+      "bulbocastanum",
+      "candolleanum",
+      "chilense",
+      "chmielewskii",
+      "corneliomulleri",
+      "etuberosum",
+      "galapagense",
+      "habrochaites",
+      "lycopersicoides",
+      "lycopersicum",
+      "neorickii",
+      "peruvianum",
+      "pimpinellifolium",
+      "tuberosum_phureja_E4_63",
+      "tuberosum_phureja_E86_69",
+      "tuberosum_stenotomum_A6_26",
+      "tuberosum_stenotomum_PG6359",
+      "tuberosum_tuberosum_RH10_15",
+      "tuberosum_tuberosum_RH",
+      "verrucosum",
+    ) map { genome -> [genome, file("genomes/${genome}.fa")] }
 
-    gff = Helixer(genomes, model)
+    helixer = Helixer(genomes, model)
 
-    peptide = GetPeptide(gff)
-    helixerBed = GetBed(gff)
-
+    peptide = GetPeptide(genomes.combine(helixer, by: 0))
+    helixerBed = GetBed(helixer)
 
     Resistify(peptide)
 
@@ -168,5 +187,5 @@ workflow {
 
     edtaBed = EdtaBed(edta)
 
-    bedtoolsIntersect = BedtoolsIntersect(helixerBed, edtaBed)
+    //bedtoolsIntersect = BedtoolsIntersect(helixerBed, edtaBed)
 }
