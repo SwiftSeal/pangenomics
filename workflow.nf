@@ -56,9 +56,9 @@ process GetBed {
     """
     agat_convert_sp_gff2bed.pl \
       --gff ${gff} \
-      -o ${genome}.bed
+      -o temp.bed
 
-    awk -i inplace '{{OFS="\t"; print \$1, \$2, \$3, \$4}}' ${gff.baseName}.bed
+    awk -F'\t' '{print \$1, \$2, \$3, \$4}' temp.bed > ${genome}.bed
     """
 }
 
