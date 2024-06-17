@@ -99,13 +99,13 @@ process Edta {
     conda 'edta.yml'
     scratch true
     cpus 8
-    memory { 16.GB * task.attempt }
+    memory { 32.GB * task.attempt }
     errorStrategy { task.exitStatus == 137 ? 'retry' : 'finish' }
     queue 'long'
     input:
     tuple val(genome), path(fasta)
     output:
-    tuple val(genome), path("${genome}.TEanno.gff3"), path("${genome}.TElib.fa")
+    tuple val(genome), path("${genome}.fa.mod.EDTA.TEanno.gff3"), path("${genome}.fa.mod.EDTA.TElib.fa")
     script:
     """
     ${EDTA_DIRECTORY}/EDTA.pl \
@@ -176,7 +176,7 @@ workflow {
 
     helixer = Helixer(genomes, model)
 
-    peptide = GetPeptide(genomes.combine(helixer, by: 0))
+    peptide = GetPeptide(helixer.combine(genomes, by: 0))
     helixerBed = GetBed(helixer)
 
     Resistify(peptide)
