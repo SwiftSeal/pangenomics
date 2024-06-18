@@ -3,7 +3,7 @@ EDTA_DIRECTORY = "/mnt/shared/scratch/msmith/apps/EDTA"
 process Helixer {
     container 'docker://gglyptodon/helixer-docker:helixer_v0.3.0_cuda_11.2.0-cudnn8'
     cpus 4
-    memory '16 GB'
+    memory '32 GB'
     queue 'gpu'
     clusterOptions '--gpus=1'
     containerOptions '--nv'
@@ -26,7 +26,8 @@ process GetPeptide {
     container 'https://depot.galaxyproject.org/singularity/agat:1.3.3--pl5321hdfd78af_0'
     publishDir 'output'
     cpus 1
-    memory '2 GB'
+    memory { 4.GB * task.attempt }
+    errorStrategy { task.exitStatus == 137 ? 'retry' : 'finish' }
     queue 'short'
     script:
     input:
@@ -46,7 +47,8 @@ process GetBed {
     container 'https://depot.galaxyproject.org/singularity/agat:1.3.3--pl5321hdfd78af_0'
     publishDir 'output'
     cpus 1
-    memory '2 GB'
+    memory { 2.GB * task.attempt }
+    errorStrategy { task.exitStatus == 137 ? 'retry' : 'finish' }
     queue 'short'
     script:
     input:
@@ -118,7 +120,8 @@ process Edta {
 process EdtaBed {
     container 'https://depot.galaxyproject.org/singularity/agat:1.3.3--pl5321hdfd78af_0'
     cpus 1
-    memory '2 GB'
+    memory { 4.GB * task.attempt }
+    errorStrategy { task.exitStatus == 137 ? 'retry' : 'finish' }
     queue 'short'
     input:
     tuple val(genome), path(gff), path(library)
