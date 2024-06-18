@@ -84,16 +84,18 @@ process Resistify {
 process Orthofinder {
     container 'docker://davidemms/orthofinder:2.5.2'
     publishDir 'output'
-    cpus 16
-    memory '16 GB'
-    queue 'medium'
+    memory { 16.GB * task.attempt }
+    errorStrategy { task.exitStatus == 137 ? 'retry' : 'finish' }
+    queue 'long'
     input:
-    path genomes
+    tuple val(genome), path(peptide)
     output:
     path "orthofinder"
     script:
     """
-    orthofinder -f ${genomes} -t 16 -o orhtofinder
+    mkdir -p peptides
+    cp *.pep peptides/
+    orthofinder -f peptides -t 16 -o orthofinder
     """
 }
 
