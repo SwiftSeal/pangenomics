@@ -88,7 +88,8 @@ process Orthofinder {
     errorStrategy { task.exitStatus == 137 ? 'retry' : 'finish' }
     queue 'long'
     input:
-    tuple val(genome), path(peptide)
+    val genomes
+    path peptides
     output:
     path "orthofinder"
     script:
@@ -101,9 +102,10 @@ process Orthofinder {
 
 process Edta {
     conda 'edta.yml'
+    publishDir 'output'
     scratch true
-    cpus 8
-    memory { 32.GB * task.attempt }
+    cpus 16
+    memory { 64.GB * task.attempt }
     errorStrategy { task.exitStatus == 137 ? 'retry' : 'finish' }
     queue 'long'
     input:
@@ -114,7 +116,7 @@ process Edta {
     """
     ${EDTA_DIRECTORY}/EDTA.pl \
       --genome ${fasta} \
-      --threads 8 \
+      --threads 16 \
       --anno 1
     """
 }
