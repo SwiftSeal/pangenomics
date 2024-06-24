@@ -88,7 +88,6 @@ process Orthofinder {
     errorStrategy { task.exitStatus == 137 ? 'retry' : 'finish' }
     queue 'long'
     input:
-    val genomes
     path peptides
     output:
     path "orthofinder"
@@ -188,7 +187,9 @@ workflow {
 
     Resistify(peptide)
 
-    orthofinder = Orthofinder(peptide.collect())
+    orthofinder = peptide
+      .map { genome, pep -> pep }
+      .collect()
 
     edta = Edta(genomes)
 
