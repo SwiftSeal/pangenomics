@@ -101,8 +101,7 @@ process Orthofinder {
 
 process Edta {
     conda 'edta.yml'
-    publishDir 'output'
-    scratch true
+    publishDir 'output', mode: 'copy'
     cpus 16
     memory { 64.GB * task.attempt }
     errorStrategy { task.exitStatus == 137 ? 'retry' : 'finish' }
@@ -110,31 +109,13 @@ process Edta {
     input:
     tuple val(genome), path(fasta)
     output:
-    tuple val(genome), path("${genome}.fa.mod.EDTA.TEanno.gff3"), path("${genome}.fa.mod.EDTA.TElib.fa")
+    tuple val(genome), path("${fasta}"), path("${fasta}.mod"), path("${fasta}.mod_divergence_plot.pdf"), path("${fasta}.mod.EDTA.anno"), path("${fasta}.mod.EDTA.combine"), path("${fasta}.mod.EDTA.final"), path("${fasta}.mod.EDTA.intact.fa"), path("${fasta}.mod.EDTA.intact.gff3"), path("${fasta}.mod.EDTA.raw"), path("${fasta}.mod.EDTA.TEanno.gff3"), path("${fasta}.mod.EDTA.TEanno.sum"), path("${fasta}.mod.EDTA.TElib.fa"), path("${fasta}.mod.MAKER.masked"), path("${fasta}.mod.RM2.raw.fa")
     script:
     """
     ${EDTA_DIRECTORY}/EDTA.pl \
       --genome ${fasta} \
       --threads 16 \
       --anno 1
-    """
-}
-
-process EdtaBed {
-    container 'https://depot.galaxyproject.org/singularity/agat:1.3.3--pl5321hdfd78af_0'
-    cpus 1
-    memory { 4.GB * task.attempt }
-    errorStrategy { task.exitStatus == 137 ? 'retry' : 'finish' }
-    queue 'short'
-    input:
-    tuple val(genome), path(gff), path(library)
-    output:
-    tuple val(genome), path("${genome}.bed")
-    script:
-    """
-    agat_convert_sp_gff2bed.pl \
-      --gff ${gff} \
-      -o ${gff.baseName}.bed
     """
 }
 
@@ -190,10 +171,9 @@ workflow {
     orthofinder = peptide
       .map { genome, pep -> pep }
       .collect()
+      | Orthofinder
 
     edta = Edta(genomes)
-
-    edtaBed = EdtaBed(edta)
 
     //bedtoolsIntersect = BedtoolsIntersect(helixerBed, edtaBed)
 }
