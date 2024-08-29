@@ -26,9 +26,9 @@ process GetPeptide {
     container 'https://depot.galaxyproject.org/singularity/agat:1.3.3--pl5321hdfd78af_0'
     publishDir 'output'
     cpus 1
-    memory { 4.GB * task.attempt }
+    time '1h'
+    memory { 8.GB * task.attempt }
     errorStrategy { task.exitStatus == 137 ? 'retry' : 'finish' }
-    queue 'short'
     script:
     input:
     tuple val(genome), path(gff), path(fasta)
@@ -47,9 +47,9 @@ process GetBed {
     container 'https://depot.galaxyproject.org/singularity/agat:1.3.3--pl5321hdfd78af_0'
     publishDir 'output'
     cpus 1
-    memory { 2.GB * task.attempt }
+    time '1h'
+    memory { 8.GB * task.attempt }
     errorStrategy { task.exitStatus == 137 ? 'retry' : 'finish' }
-    queue 'short'
     script:
     input:
     tuple val(genome), path(gff)
@@ -65,7 +65,7 @@ process GetBed {
 }
 
 process Resistify {
-    conda 'resistify'
+    container 'docker://quay.io/biocontainers/resistify:0.3.0--pyhdfd78af_0'
     publishDir 'output'
     cpus 4
     memory { 8.GB * task.attempt }
@@ -77,16 +77,16 @@ process Resistify {
     path "${genome}"
     script:
     """
-    resistify --threads 4 ${peptide} ${genome}
+    resistify --threads $task.cpus ${peptide} ${genome}
     """
 }
 
 process Orthofinder {
     container 'docker://davidemms/orthofinder:2.5.2'
     publishDir 'output'
+    time '6d'
     memory { 16.GB * task.attempt }
     errorStrategy { task.exitStatus == 137 ? 'retry' : 'finish' }
-    queue 'long'
     input:
     path peptides
     output:
@@ -100,21 +100,22 @@ process Orthofinder {
 }
 
 process Edta {
-    conda 'edta.yml'
+    container 'docker://quay.io/biocontainers/edta:2.0.0--hdfd78af_0'
     publishDir 'output', mode: 'copy'
     cpus 16
-    memory { 64.GB * task.attempt }
+    time '6d'
+    memory { 128.GB * task.attempt }
     errorStrategy { task.exitStatus == 137 ? 'retry' : 'finish' }
-    queue 'long'
     input:
     tuple val(genome), path(fasta)
     output:
-    tuple val(genome), path("${fasta}"), path("${fasta}.mod"), path("${fasta}.mod_divergence_plot.pdf"), path("${fasta}.mod.EDTA.anno"), path("${fasta}.mod.EDTA.combine"), path("${fasta}.mod.EDTA.final"), path("${fasta}.mod.EDTA.intact.fa"), path("${fasta}.mod.EDTA.intact.gff3"), path("${fasta}.mod.EDTA.raw"), path("${fasta}.mod.EDTA.TEanno.gff3"), path("${fasta}.mod.EDTA.TEanno.sum"), path("${fasta}.mod.EDTA.TElib.fa"), path("${fasta}.mod.MAKER.masked"), path("${fasta}.mod.RM2.raw.fa")
+    tuple val(genome), path("${fasta}"), path("${fasta}.mod"), path("${fasta}.mod.EDTA.anno"), path("${fasta}.mod.EDTA.combine"), path("${fasta}.mod.EDTA.final"), path("${fasta}.mod.EDTA.intact.gff3"), path("${fasta}.mod.EDTA.raw"), path("${fasta}.mod.EDTA.TEanno.gff3"), path("${fasta}.mod.EDTA.TEanno.sum"), path("${fasta}.mod.EDTA.TElib.fa"), path("${fasta}.mod.MAKER.masked")
     script:
     """
-    ${EDTA_DIRECTORY}/EDTA.pl \
+    unset which # really???
+    EDTA.pl \
       --genome ${fasta} \
-      --threads 16 \
+      --threads $task.cpus \
       --anno 1
     """
 }
