@@ -2,6 +2,7 @@ EDTA_DIRECTORY = "/mnt/shared/scratch/msmith/apps/EDTA"
 
 process Helixer {
     container 'docker://gglyptodon/helixer-docker:helixer_v0.3.0_cuda_11.2.0-cudnn8'
+    publishDir 'output'
     cpus 4
     memory '32 GB'
     queue 'gpu'
@@ -40,27 +41,6 @@ process GetPeptide {
       -g ${gff} \
       -f ${fasta} \
       -p -o ${genome}.pep
-    """
-}
-
-process GetBed {
-    container 'https://depot.galaxyproject.org/singularity/agat:1.3.3--pl5321hdfd78af_0'
-    publishDir 'output'
-    cpus 1
-    time '1h'
-    memory { 8.GB * task.attempt }
-    errorStrategy { task.exitStatus == 137 ? 'retry' : 'finish' }
-    script:
-    input:
-    tuple val(genome), path(gff)
-    output:
-    tuple val(genome), path("${genome}.bed")
-    """
-    agat_convert_sp_gff2bed.pl \
-      --gff ${gff} \
-      -o temp.bed
-
-    awk -F'\t' '{print \$1, \$2, \$3, \$4}' temp.bed > ${genome}.bed
     """
 }
 
@@ -120,22 +100,6 @@ process Edta {
     """
 }
 
-//process BedtoolsIntersect {
-//    container 'quay.io/biocontainers/bedtools:2.30.0--hdb8b3b0_0'
-//    cpus 1
-//    memory '2 GB'
-//    queue 'short'
-//    input:
-//    path bed1
-//    path bed2
-//    output:
-//    path "${bed1.baseName}.intersect.${bed2.baseName}.bed"
-//    script:
-//    """
-//    bedtools intersect -a ${bed1} -b ${bed2} > ${bed1.baseName}.intersect.${bed2.baseName}.bed
-//    """
-//}
-
 workflow {
     model = file("/mnt/shared/home/msmith/.local/share/Helixer/models/land_plant/land_plant_v0.3_a_0080.h5")
     genomes = Channel.of(
@@ -165,7 +129,6 @@ workflow {
     helixer = Helixer(genomes, model)
 
     peptide = GetPeptide(helixer.combine(genomes, by: 0))
-    helixerBed = GetBed(helixer)
 
     Resistify(peptide)
 
@@ -175,6 +138,4 @@ workflow {
       | Orthofinder
 
     edta = Edta(genomes)
-
-    //bedtoolsIntersect = BedtoolsIntersect(helixerBed, edtaBed)
 }
