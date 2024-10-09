@@ -48,7 +48,7 @@ process Resistify {
     container 'docker://quay.io/biocontainers/resistify:0.3.0--pyhdfd78af_0'
     publishDir 'output'
     cpus 4
-    memory { 8.GB * task.attempt }
+    memory { 16.GB * task.attempt }
     errorStrategy { task.exitStatus == 137 ? 'retry' : 'finish' }
     maxRetries 3
     input:
